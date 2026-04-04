@@ -1,0 +1,94 @@
+EXPLAIN ANALYZE
+SELECT
+    o.seller_id,
+    oi.product_id,
+    SUM(oi.quantity)   AS total_qty,
+    SUM(oi.subtotal)   AS total_revenue
+FROM orders o
+JOIN order_item oi ON oi.order_id = o.order_id
+GROUP BY o.seller_id, oi.product_id
+ORDER BY o.seller_id, total_revenue DESC;
+
+ Incremental Sort  (cost=498666.63..512456.75 rows=40000 width=48) (actual time=1117.726..1161.511 rows=455 loops=1)
+   Sort Key: o.seller_id, (sum(oi.subtotal)) DESC
+   Presorted Key: o.seller_id
+   Full-sort Groups: 14  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+   ->  Finalize GroupAggregate  (cost=498600.11..509434.10 rows=40000 width=48) (actual time=1117.667..1161.370 rows=455 loops=1)
+         Group Key: o.seller_id, oi.product_id
+         ->  Gather Merge  (cost=498600.11..507934.10 rows=80000 width=48) (actual time=1117.652..1161.022 rows=1365 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               ->  Sort  (cost=497600.09..497700.09 rows=40000 width=48) (actual time=1105.343..1105.385 rows=455 loops=3)
+                     Sort Key: o.seller_id, oi.product_id
+                     Sort Method: quicksort  Memory: 88kB
+                     Worker 0:  Sort Method: quicksort  Memory: 88kB
+                     Worker 1:  Sort Method: quicksort  Memory: 88kB
+                     ->  Partial HashAggregate  (cost=454494.80..494542.55 rows=40000 width=48) (actual time=1105.144..1105.283 rows=455 loops=3)
+                           Group Key: o.seller_id, oi.product_id
+                           Planned Partitions: 4  Batches: 1  Memory Usage: 657kB
+                           Worker 0:  Batches: 1  Memory Usage: 657kB
+                           Worker 1:  Batches: 1  Memory Usage: 657kB
+                           ->  Parallel Hash Join  (cost=57410.25..209524.78 rows=2892635 width=28) (actual time=609.827..820.313 rows=2314108 loops=3)
+                                 Hash Cond: (oi.order_id = o.order_id)
+                                 ->  Parallel Seq Scan on order_item oi  (cost=0.00..100497.35 rows=2892635 width=28) (actual time=0.490..135.702 rows=2314108 loops=3)
+                                 ->  Parallel Hash  (cost=38611.33..38611.33 rows=1145833 width=8) (actual time=209.812..209.812 rows=916667 loops=3)
+                                       Buckets: 131072  Batches: 64  Memory Usage: 2752kB
+                                       ->  Parallel Seq Scan on orders o  (cost=0.00..38611.33 rows=1145833 width=8) (actual time=95.744..142.086 rows=916667 loops=3)
+ Planning Time: 0.753 ms
+ JIT:
+   Functions: 45
+   Options: Inlining true, Optimization true, Expressions true, Deforming true
+   Timing: Generation 3.068 ms, Inlining 108.490 ms, Optimization 107.738 ms, Emission 71.061 ms, Total 290.356 ms
+ Execution Time: 1163.968 ms
+(31 rows)
+
+EXPLAIN ANALYZE
+SELECT
+    op.seller_id,
+    oip.product_id,
+    SUM(oip.quantity)  AS total_qty,
+    SUM(oip.subtotal)  AS total_revenue
+FROM orders_partitioned op
+JOIN order_item_partitioned oip ON oip.order_id = op.order_id
+GROUP BY op.seller_id, oip.product_id
+ORDER BY op.seller_id, total_revenue DESC;
+
+ Incremental Sort  (cost=2488958663.86..2488972453.97 rows=40000 width=48) (actual time=1322.863..1368.183 rows=455 loops=1)
+   Sort Key: op.seller_id, (sum(oip.subtotal)) DESC
+   Presorted Key: op.seller_id
+   Full-sort Groups: 14  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+   ->  Finalize GroupAggregate  (cost=2488958597.34..2488969431.33 rows=40000 width=48) (actual time=1322.810..1368.045 rows=455 loops=1)
+         Group Key: op.seller_id, oip.product_id
+         ->  Gather Merge  (cost=2488958597.34..2488967931.33 rows=80000 width=48) (actual time=1322.796..1367.698 rows=1365 loops=1)
+               Workers Planned: 2
+               Workers Launched: 2
+               ->  Sort  (cost=2488957597.32..2488957697.32 rows=40000 width=48) (actual time=1310.820..1310.837 rows=455 loops=3)
+                     Sort Key: op.seller_id, oip.product_id
+                     Sort Method: quicksort  Memory: 88kB
+                     Worker 0:  Sort Method: quicksort  Memory: 88kB
+                     Worker 1:  Sort Method: quicksort  Memory: 88kB
+                     ->  Partial HashAggregate  (cost=2187687211.92..2488954539.78 rows=40000 width=48) (actual time=1310.611..1310.730 rows=455 loops=3)
+                           Group Key: op.seller_id, oip.product_id
+                           Planned Partitions: 4  Batches: 1  Memory Usage: 657kB
+                           Worker 0:  Batches: 1  Memory Usage: 657kB
+                           Worker 1:  Batches: 1  Memory Usage: 657kB
+                           ->  Parallel Hash Join  (cost=49911.88..321554403.92 rows=22035516552 width=28) (actual time=755.305..1022.563 rows=2314108 loops=3)
+                                 Hash Cond: (oip.order_id = op.order_id)
+                                 ->  Parallel Append  (cost=0.00..109611.39 rows=2535195 width=28) (actual time=0.023..211.959 rows=2314108 loops=3)
+                                       ->  Parallel Seq Scan on order_item_2025_10 oip_3  (cost=0.00..32671.98 rows=854498 width=28) (actual time=0.030..45.671 rows=780094 loops=3)
+                                       ->  Parallel Seq Scan on order_item_2025_08 oip_1  (cost=0.00..32670.62 rows=854462 width=28) (actual time=0.029..68.582 rows=1170074 loops=2)
+                                       ->  Parallel Seq Scan on order_item_2025_09 oip_2  (cost=0.00..31577.81 rows=825881 width=28) (actual time=0.012..130.658 rows=2261895 loops=1)
+                                       ->  Parallel Seq Scan on order_item_default oip_4  (cost=0.00..15.00 rows=500 width=28) (actual time=0.000..0.001 rows=0 loops=1)
+                                 ->  Parallel Hash  (cost=38027.89..38027.89 rows=724319 width=8) (actual time=272.357..272.359 rows=916667 loops=3)
+                                       Buckets: 131072  Batches: 32  Memory Usage: 4416kB
+                                       ->  Parallel Append  (cost=0.00..38027.89 rows=724319 width=8) (actual time=124.153..203.749 rows=916667 loops=3)
+                                             ->  Parallel Seq Scan on orders_2025_10 op_3  (cost=0.00..11593.80 rows=244080 width=8) (actual time=112.190..158.887 rows=926985 loops=1)
+                                             ->  Parallel Seq Scan on orders_2025_08 op_1  (cost=0.00..11592.53 rows=244053 width=8) (actual time=38.928..56.276 rows=309006 loops=3)
+                                             ->  Parallel Seq Scan on orders_2025_09 op_2  (cost=0.00..11206.20 rows=235920 width=8) (actual time=71.777..96.360 rows=447999 loops=2)
+                                             ->  Parallel Seq Scan on orders_default op_4  (cost=0.00..13.76 rows=376 width=8) (actual time=0.002..0.002 rows=0 loops=1)
+ Planning Time: 0.266 ms
+ JIT:
+   Functions: 81
+   Options: Inlining true, Optimization true, Expressions true, Deforming true
+   Timing: Generation 2.256 ms, Inlining 105.972 ms, Optimization 152.759 ms, Emission 113.866 ms, Total 374.853 ms
+ Execution Time: 1369.184 ms

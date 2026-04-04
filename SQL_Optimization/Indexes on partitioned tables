@@ -1,0 +1,11 @@
+-- orders_partitioned indexes
+CREATE INDEX idx_op_seller_id   ON orders_partitioned (seller_id);
+CREATE INDEX idx_op_order_date  ON orders_partitioned (order_date);
+CREATE INDEX idx_op_status      ON orders_partitioned (status);
+CREATE INDEX idx_op_amount      ON orders_partitioned (total_amount DESC);
+
+-- order_item_partitioned indexes
+-- ★ Required: index on product_id
+CREATE INDEX idx_oip_product_id ON order_item_partitioned (product_id);
+CREATE INDEX idx_oip_order_id   ON order_item_partitioned (order_id);
+CREATE INDEX idx_oip_order_date ON order_item_partitioned (order_date);

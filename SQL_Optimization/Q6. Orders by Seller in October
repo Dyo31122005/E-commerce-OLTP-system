@@ -1,0 +1,50 @@
+EXPLAIN ANALYZE
+SELECT
+    o.seller_id,
+    COUNT(*)            AS total_orders,
+    SUM(o.total_amount) AS total_revenue
+FROM orders o
+WHERE o.order_date >= '2025-10-01'
+  AND o.order_date <  '2025-11-01'
+GROUP BY o.seller_id
+ORDER BY total_revenue DESC;
+
+ Sort  (cost=23573.06..23573.56 rows=200 width=44) (actual time=296.499..296.503 rows=123 loops=1)
+   Sort Key: (sum(total_amount)) DESC
+   Sort Method: quicksort  Memory: 34kB
+   ->  HashAggregate  (cost=23562.92..23565.42 rows=200 width=44) (actual time=296.449..296.467 rows=123 loops=1)
+         Group Key: seller_id
+         Batches: 1  Memory Usage: 96kB
+         ->  Bitmap Heap Scan on orders o  (cost=289.37..23459.79 rows=13750 width=20) (actual time=56.268..160.187 rows=926985 loops=1)
+               Recheck Cond: ((order_date >= '2025-10-01 00:00:00'::timestamp without time zone) AND (order_date < '2025-11-01 00:00:00'::timestamp without time zone))
+               Heap Blocks: exact=27152
+               ->  Bitmap Index Scan on idx_order_date  (cost=0.00..285.93 rows=13750 width=0) (actual time=53.047..53.048 rows=926985 loops=1)
+                     Index Cond: ((order_date >= '2025-10-01 00:00:00'::timestamp without time zone) AND (order_date < '2025-11-01 00:00:00'::timestamp without time zone))
+ Planning Time: 0.219 ms
+ Execution Time: 296.751 ms
+
+
+EXPLAIN ANALYZE
+SELECT
+    seller_id,
+    COUNT(*)            AS total_orders,
+    SUM(total_amount)   AS total_revenue
+FROM orders_partitioned
+WHERE order_date >= '2025-10-01'
+  AND order_date <  '2025-11-01'
+GROUP BY seller_id
+ORDER BY total_revenue DESC;
+
+Sort  (cost=6291.88..6292.38 rows=200 width=44) (actual time=249.649..249.653 rows=123 loops=1)
+   Sort Key: (sum(orders_partitioned.total_amount)) DESC
+   Sort Method: quicksort  Memory: 34kB
+   ->  HashAggregate  (cost=6281.74..6284.24 rows=200 width=44) (actual time=249.602..249.620 rows=123 loops=1)
+         Group Key: orders_partitioned.seller_id
+         Batches: 1  Memory Usage: 96kB
+         ->  Bitmap Heap Scan on orders_2025_10 orders_partitioned  (cost=94.45..6259.77 rows=2929 width=20) (actual time=50.337..125.715 rows=926985 loops=1)
+               Recheck Cond: ((order_date >= '2025-10-01 00:00:00'::timestamp without time zone) AND (order_date < '2025-11-01 00:00:00'::timestamp without time zone))
+               Heap Blocks: exact=9153
+               ->  Bitmap Index Scan on orders_2025_10_order_date_idx  (cost=0.00..93.71 rows=2929 width=0) (actual time=49.387..49.387 rows=926985 loops=1)
+                     Index Cond: ((order_date >= '2025-10-01 00:00:00'::timestamp without time zone) AND (order_date < '2025-11-01 00:00:00'::timestamp without time zone))
+ Planning Time: 0.340 ms
+ Execution Time: 249.715 ms

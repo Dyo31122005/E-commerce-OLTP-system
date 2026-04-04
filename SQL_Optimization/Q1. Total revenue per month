@@ -1,0 +1,62 @@
+EXPLAIN ANALYZE
+SELECT
+    DATE_TRUNC('month', order_date)  AS month,
+    SUM(total_amount)                AS total_revenue,
+    COUNT(*)                         AS total_orders
+FROM orders
+GROUP BY 1
+ORDER BY 1;
+
+Finalize GroupAggregate  (cost=51080.33..51134.00 rows=200 width=48) (actual ti
+me=224.818..226.733 rows=3 loops=1)
+   Group Key: (date_trunc('month'::text, order_date))
+   ->  Gather Merge  (cost=51080.33..51127.00 rows=400 width=48) (actual time=224.809..226.722 rows=9 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         ->  Sort  (cost=50080.31..50080.81 rows=200 width=48) (actual time=221.274..221.274 rows=3 loops=3)
+               Sort Key: (date_trunc('month'::text, order_date))
+               Sort Method: quicksort  Memory: 25kB
+               Worker 0:  Sort Method: quicksort  Memory: 25kB
+               Worker 1:  Sort Method: quicksort  Memory: 25kB
+               ->  Partial HashAggregate  (cost=50069.66..50072.66 rows=200 width=48) (actual time=221.256..221.258 rows=3 loops=3)
+                     Group Key: date_trunc('month'::text, order_date)
+                     Batches: 1  Memory Usage: 40kB
+                     Worker 0:  Batches: 1  Memory Usage: 40kB
+                     Worker 1:  Batches: 1  Memory Usage: 40kB
+                     ->  Parallel Seq Scan on orders  (cost=0.00..41475.92 rows=1145833 width=24) (actual time=0.028..104.759 rows=916667 loops=3)
+ Planning Time: 0.187 ms
+ Execution Time: 248.705 ms
+
+[partitioned]
+
+EXPLAIN ANALYZE
+SELECT
+    DATE_TRUNC('month', order_date) AS month,
+    SUM(total_amount)               AS total_revenue,
+    COUNT(*)                        AS total_orders
+FROM orders_partitioned
+GROUP BY 1
+ORDER BY 1;
+
+Finalize GroupAggregate  (cost=46282.03..46335.70 rows=200 width=48) (actual time=300.362..303.261 rows=3 loops=1)
+   Group Key: (date_trunc('month'::text, orders_partitioned.order_date))
+   ->  Gather Merge  (cost=46282.03..46328.70 rows=400 width=48) (actual time=300.353..303.251 rows=6 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         ->  Sort  (cost=45282.00..45282.50 rows=200 width=48) (actual time=289.092..289.093 rows=2 loops=3)
+               Sort Key: (date_trunc('month'::text, orders_partitioned.order_date))
+               Sort Method: quicksort  Memory: 25kB
+               Worker 0:  Sort Method: quicksort  Memory: 25kB
+               Worker 1:  Sort Method: quicksort  Memory: 25kB
+               ->  Partial HashAggregate  (cost=45271.36..45274.36 rows=200 width=48) (actual time=289.075..289.077 rows=2 loops=3)
+                     Group Key: (date_trunc('month'::text, orders_partitioned.order_date))
+                     Batches: 1  Memory Usage: 40kB
+                     Worker 0:  Batches: 1  Memory Usage: 40kB
+                     Worker 1:  Batches: 1  Memory Usage: 40kB
+                     ->  Parallel Append  (cost=0.00..39838.97 rows=724319 width=24) (actual time=0.066..155.421 rows=916667 loops=3)
+                           ->  Parallel Seq Scan on orders_2025_10 orders_partitioned_3  (cost=0.00..12204.00 rows=244080 width=24) (actual time=0.019..40.452 rows=308995 loops=3)
+                           ->  Parallel Seq Scan on orders_2025_08 orders_partitioned_1  (cost=0.00..12202.67 rows=244053 width=24) (actual time=0.063..61.121 rows=463508 loops=2)
+                           ->  Parallel Seq Scan on orders_2025_09 orders_partitioned_2  (cost=0.00..11796.00 rows=235920 width=24) (actual time=0.043..119.918 rows=895998 loops=1)
+                           ->  Parallel Seq Scan on orders_default orders_partitioned_4  (cost=0.00..14.70 rows=376 width=24) (actual time=0.003..0.003 rows=0 loops=1)
+ Planning Time: 1.782 ms
+ Execution Time: 304.238 ms

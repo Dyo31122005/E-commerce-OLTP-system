@@ -1,0 +1,26 @@
+INSERT INTO orders_partitioned
+    (order_id, order_date, seller_id, status, total_amount, created_at)
+SELECT
+    order_id, order_date, seller_id, status, total_amount, created_at
+FROM orders;
+
+INSERT INTO order_item_partitioned
+    (order_item_id, order_id, product_id, order_date,
+     quantity, unit_price, subtotal, created_at)
+SELECT
+    order_item_id, order_id, product_id, order_date,
+    quantity, unit_price, subtotal, created_at
+FROM order_item;
+
+-- Verify row counts
+SELECT 'orders_partitioned'      AS tbl, COUNT(*) FROM orders_partitioned
+UNION ALL
+SELECT 'order_item_partitioned'  AS tbl, COUNT(*) FROM order_item_partitioned;
+
+INSERT 0 2750000
+INSERT 0 6942325
+          tbl           |  count
+------------------------+---------
+ orders_partitioned     | 2750000
+ order_item_partitioned | 6942325
+(2 rows)

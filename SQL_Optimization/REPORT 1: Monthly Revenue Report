@@ -1,0 +1,46 @@
+--  Goal   : Total revenue and total orders per month
+--  Columns: month, total_orders, total_quantity, total_revenue
+--  Filter : date range (start_date → end_date)
+-- ============================================================
+CREATE OR REPLACE FUNCTION rpt_monthly_revenue(
+    p_start_date DATE,
+    p_end_date   DATE
+)
+RETURNS TABLE (
+    month          TEXT,
+    total_orders   BIGINT,
+    total_quantity BIGINT,
+    total_revenue  NUMERIC(18,2)
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Validate input
+    IF p_start_date > p_end_date THEN
+        RAISE EXCEPTION 'start_date (%) must be <= end_date (%)', p_start_date, p_end_date;
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        TO_CHAR(DATE_TRUNC('month', o.order_date), 'YYYY-MM')  AS month,
+        COUNT(DISTINCT o.order_id)                              AS total_orders,
+        COALESCE(SUM(oi.quantity), 0)::BIGINT                  AS total_quantity,
+        COALESCE(SUM(oi.subtotal), 0)                          AS total_revenue
+    FROM orders o
+    JOIN order_item oi ON oi.order_id = o.order_id
+    WHERE o.order_date >= p_start_date::TIMESTAMP
+      AND o.order_date <  (p_end_date + INTERVAL '1 day')::TIMESTAMP
+      AND o.status NOT IN ('CANCELLED', 'RETURNED')
+    GROUP BY DATE_TRUNC('month', o.order_date)
+    ORDER BY DATE_TRUNC('month', o.order_date);
+END;
+$$;
+
+
+SELECT * FROM rpt_monthly_revenue('2025-08-01', '2025-10-31');
+
+ month  | total_orders | total_quantity |   total_revenue
+---------+--------------+----------------+--------------------
+ 2025-08 |       834056 |        6313045 | 136275752441232.83
+ 2025-09 |       806251 |        6108596 | 132007472445212.64
+ 2025-10 |       834250 |        6318764 | 136617236083256.64

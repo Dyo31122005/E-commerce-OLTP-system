@@ -1,0 +1,94 @@
+--  Goal   : Top products for each brand by quantity sold
+--  Columns: brand_id, brand_name, product_id, product_name,
+--           total_quantity, total_revenue
+--  Filter : date range + optional seller list
+-- ============================================================
+CREATE OR REPLACE FUNCTION rpt_top_products_per_brand(
+    p_start_date DATE,
+    p_end_date   DATE,
+    p_seller_ids INT[] DEFAULT NULL,   -- NULL = all sellers
+    p_top_n      INT   DEFAULT 5       -- top N products per brand
+)
+RETURNS TABLE (
+    brand_id       INT,
+    brand_name     VARCHAR(100),
+    product_id     INT,
+    product_name   VARCHAR(200),
+    total_quantity BIGINT,
+    total_revenue  NUMERIC(18,2),
+    rank_in_brand  BIGINT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_start_date > p_end_date THEN
+        RAISE EXCEPTION 'start_date (%) must be <= end_date (%)', p_start_date, p_end_date;
+    END IF;
+
+    IF p_top_n IS NULL OR p_top_n < 1 THEN
+        p_top_n := 5;
+    END IF;
+
+    RETURN QUERY
+    WITH product_sales AS (
+        -- Aggregate sales per product within date range
+        SELECT
+            p.brand_id,
+            b.brand_name,
+            p.product_id,
+            p.product_name,
+            SUM(oi.quantity)::BIGINT AS total_quantity,
+            SUM(oi.subtotal)         AS total_revenue
+        FROM orders o
+        JOIN order_item oi ON oi.order_id  = o.order_id
+        JOIN product    p  ON p.product_id = oi.product_id
+        JOIN brand      b  ON b.brand_id   = p.brand_id
+        WHERE o.order_date >= p_start_date::TIMESTAMP
+          AND o.order_date <  (p_end_date + INTERVAL '1 day')::TIMESTAMP
+          AND o.status NOT IN ('CANCELLED', 'RETURNED')
+          AND (p_seller_ids IS NULL OR o.seller_id = ANY(p_seller_ids))
+        GROUP BY p.brand_id, b.brand_name, p.product_id, p.product_name
+    ),
+    ranked AS (
+        -- Rank products within each brand
+        SELECT
+            ps.*,
+            RANK() OVER (
+                PARTITION BY ps.brand_id
+                ORDER BY ps.total_quantity DESC
+            ) AS rank_in_brand
+        FROM product_sales ps
+    )
+    SELECT
+        r.brand_id,
+        r.brand_name,
+        r.product_id,
+        r.product_name,
+        r.total_quantity,
+        r.total_revenue,
+        r.rank_in_brand
+    FROM ranked r
+    WHERE r.rank_in_brand <= p_top_n
+    ORDER BY r.brand_id, r.rank_in_brand;
+END;
+$$;
+
+-- Usage examples:
+-- Top 5 products per brand (default):
+-- SELECT * FROM rpt_top_products_per_brand('2025-08-01', '2025-10-31');
+--
+-- Top 3 products per brand, filtered by sellers:
+-- SELECT * FROM rpt_top_products_per_brand('2025-08-01', '2025-10-31', ARRAY[1,2,3], 3);
+brand_id |           brand_name           | product_id |                product_name                | total_quantity |  total_revenue   | rank_in_brand
+----------+--------------------------------+------------+--------------------------------------------+----------------+------------------+---------------
+        1 | Samsung                        |        933 | Re-contextualized tertiary capacity        |          29784 | 1017154326961.44 |             1
+      109 | Maynard-Green                  |        352 | Customizable 5thgeneration website         |          30343 | 1124014706092.68 |             1
+      113 | Alvarez-Rojas                  |        334 | Quality-focused reciprocal functionalities |          30382 |  966721584339.50 |             1
+      117 | Calderon, Riddle and Wallace   |        306 | User-centric impactful capability          |          29865 |  293767822111.50 |             1
+      118 | Hall Group                     |        255 | Grass-roots client-server parallelism      |          29992 | 1354258208649.20 |             1
+      121 | Grimes Group                   |        121 | Self-enabling mission-critical project     |          29939 |  370198461544.73 |             1
+      150 | Ellis-Phillips                 |        458 | Expanded intangible instruction set        |          50018 | 1058368350491.00 |             1
+      161 | Singleton, Nelson and Griffith |        242 | Reactive secondary orchestration           |          50287 |  474692592259.05 |             1
+      166 | Wallace Ltd                    |         80 | Switchable interactive algorithm           |          50072 | 1622739974488.16 |             1
+      213 | Martinez, Waters and Robles    |        917 | Down-sized cohesive interface              |          60227 |  613429269910.41 |             1
+      224 | Juarez-Salazar                 |        820 | Innovative optimal capacity                |          60327 | 1766199713652.63 |             1

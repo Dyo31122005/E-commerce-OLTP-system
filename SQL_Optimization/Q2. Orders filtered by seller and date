@@ -1,0 +1,51 @@
+EXPLAIN ANALYZE
+SELECT
+    o.order_id,
+    o.order_date,
+    o.status,
+    o.total_amount
+FROM orders o
+WHERE o.seller_id  = 1
+  AND o.order_date >= '2025-09-01'
+  AND o.order_date <  '2025-10-01'
+ORDER BY o.order_date;
+
+ Sort  (cost=706.65..706.82 rows=69 width=86) (actual time=79.189..79.557 rows=7171 loops=1)
+   Sort Key: order_date
+   Sort Method: quicksort  Memory: 753kB
+   ->  Bitmap Heap Scan on orders o  (cost=437.77..704.54 rows=69 width=86) (actual time=61.197..77.439 rows=7171 loops=1)
+         Recheck Cond: ((seller_id = 1) AND (order_date >= '2025-09-01 00:00:00'::timestamp without time zone) AND (order_date < '2025-10-01 00:00:00'::timestamp without time zone))
+         Heap Blocks: exact=6322
+         ->  BitmapAnd  (cost=437.77..437.77 rows=69 width=0) (actual time=60.509..60.509 rows=0 loops=1)
+               ->  Bitmap Index Scan on idx_order_seller  (cost=0.00..151.56 rows=13750 width=0) (actual time=9.466..9.466 rows=22260 loops=1)
+                     Index Cond: (seller_id = 1)
+               ->  Bitmap Index Scan on idx_order_date  (cost=0.00..285.93 rows=13750 width=0) (actual time=50.421..50.421 rows=895998 loops=1)
+ Planning Time: 0.092 ms
+ Execution Time: 69.546 ms
+
+
+EXPLAIN ANALYZE
+SELECT
+    order_id,
+    order_date,
+    status,
+    total_amount
+FROM orders_partitioned
+WHERE seller_id  = 1
+  AND order_date >= '2025-09-01'
+  AND order_date <  '2025-10-01'
+ORDER BY order_date;
+
+  Sort  (cost=185.49..185.53 rows=14 width=86) (actual time=74.422..74.971 rows=7171 loops=1)
+   Sort Key: orders_partitioned.order_date
+   Sort Method: quicksort  Memory: 753kB
+   ->  Bitmap Heap Scan on orders_2025_09 orders_partitioned  (cost=130.65..185.22 rows=14 width=86) (actual time=52.736..72.606 rows=7171 loops=1)
+         Recheck Cond: ((seller_id = 1) AND (order_date >= '2025-09-01 00:00:00'::timestamp without time zone) AND (order_date < '2025-10-01 00:00:00'::timestamp without time zone))
+         Heap Blocks: exact=4955
+         ->  BitmapAnd  (cost=130.65..130.65 rows=14 width=0) (actual time=52.246..52.246 rows=0 loops=1)
+               ->  Bitmap Index Scan on orders_2025_09_seller_id_idx  (cost=0.00..37.66 rows=2831 width=0) (actual time=2.455..2.456 rows=7171 loops=1)
+                     Index Cond: (seller_id = 1)
+               ->  Bitmap Index Scan on orders_2025_09_order_date_idx  (cost=0.00..92.73 rows=2831 width=0) (actual time=49.639..49.640 rows=895998 loops=1)
+                     Index Cond: ((order_date >= '2025-09-01 00:00:00'::timestamp without time zone) AND (order_date < '2025-10-01 00:00:00'::timestamp without time zone))
+ Planning Time: 0.389 ms
+ Execution Time: 75.152 ms

@@ -1,0 +1,57 @@
+EXPLAIN ANALYZE
+SELECT
+    oi.order_item_id,
+    oi.order_id,
+    oi.order_date,
+    oi.quantity,
+    oi.unit_price,
+    oi.subtotal
+FROM order_item oi
+WHERE oi.product_id = 1
+ORDER BY oi.order_date;
+
+Sort  (cost=62827.63..62914.41 rows=34712 width=56) (actual time=0.051..0.052 rows=0 loops=1)
+   Sort Key: order_date
+   Sort Method: quicksort  Memory: 25kB
+   ->  Bitmap Heap Scan on order_item oi  (cost=389.45..60209.80 rows=34712 width=56) (actual time=0.045..0.046 rows=0 loops=1)
+         Recheck Cond: (product_id = 1)
+         ->  Bitmap Index Scan on idx_oi_product_id  (cost=0.00..380.77 rows=34712 width=0) (actual time=0.041..0.042 rows=0 loops=1)
+               Index Cond: (product_id = 1)
+ Planning Time: 0.688 ms
+ Execution Time: 0.090 ms
+
+EXPLAIN ANALYZE
+SELECT
+    order_item_id,
+    order_id,
+    order_date,
+    quantity,
+    unit_price,
+    subtotal
+FROM order_item_partitioned
+WHERE product_id = 1
+ORDER BY order_date;
+
+ Sort  (cost=58959.09..59035.15 rows=30423 width=56) (actual time=0.091..0.094 rows=0 loops=1)
+   Sort Key: order_item_partitioned.order_date
+   Sort Method: quicksort  Memory: 25kB
+   ->  Append  (cost=119.90..56693.66 rows=30423 width=56) (actual time=0.085..0.087 rows=0 loops=1)
+         ->  Bitmap Heap Scan on order_item_2025_08 order_item_partitioned_1  (cost=119.90..19054.92 rows=10254 width=56) (actual time=0.049..0.050 rows=0 loops=1)
+               Recheck Cond: (product_id = 1)
+               ->  Bitmap Index Scan on order_item_2025_08_product_id_idx  (cost=0.00..117.33 rows=10254 width=0) (actual time=0.046..0.046 rows=0 loops=1)
+                     Index Cond: (product_id = 1)
+         ->  Bitmap Heap Scan on order_item_2025_09 order_item_partitioned_2  (cost=117.24..18418.74 rows=9911 width=56) (actual time=0.016..0.016 rows=0 loops=1)
+               Recheck Cond: (product_id = 1)
+               ->  Bitmap Index Scan on order_item_2025_09_product_id_idx  (cost=0.00..114.76 rows=9911 width=0) (actual time=0.015..0.015 rows=0 loops=1)
+                     Index Cond: (product_id = 1)
+         ->  Bitmap Heap Scan on order_item_2025_10 order_item_partitioned_3  (cost=119.90..19055.24 rows=10254 width=56) (actual time=0.014..0.014 rows=0 loops=1)
+               Recheck Cond: (product_id = 1)
+               ->  Bitmap Index Scan on order_item_2025_10_product_id_idx  (cost=0.00..117.33 rows=10254 width=0) (actual time=0.014..0.014 rows=0 loops=1)
+                     Index Cond: (product_id = 1)
+         ->  Bitmap Heap Scan on order_item_default order_item_partitioned_4  (cost=4.18..12.64 rows=4 width=56) (actual time=0.004..0.004 rows=0 loops=1)
+               Recheck Cond: (product_id = 1)
+               ->  Bitmap Index Scan on order_item_default_product_id_idx  (cost=0.00..4.18 rows=4 width=0) (actual time=0.003..0.003 rows=0 loops=1)
+                     Index Cond: (product_id = 1)
+ Planning Time: 0.402 ms
+ Execution Time: 0.162 ms
+

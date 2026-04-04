@@ -1,0 +1,66 @@
+EXPLAIN ANALYZE
+SELECT
+    order_id,
+    order_date,
+    seller_id,
+    status,
+    total_amount
+FROM orders
+ORDER BY total_amount DESC
+LIMIT 10;
+
+ Limit  (cost=64372.40..64373.56 rows=10 width=90) (actual time=235.397..237.831 rows=10 loops=1)
+   ->  Gather Merge  (cost=64372.40..331752.10 rows=2291666 width=90) (actual time=235.390..237.820 rows=10 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         ->  Sort  (cost=63372.37..66236.96 rows=1145833 width=90) (actual time=230.331..230.332 rows=7 loops=3)
+               Sort Key: total_amount DESC
+               Sort Method: top-N heapsort  Memory: 26kB
+               Worker 0:  Sort Method: top-N heapsort  Memory: 26kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 26kB
+               ->  Parallel Seq Scan on orders  (cost=0.00..38611.33 rows=1145833 width=90) (actual time=0.040..61.669 rows=916667 loops=3)
+ Planning Time: 0.246 ms
+ Execution Time: 237.890 ms
+
+EXPLAIN ANALYZE
+SELECT
+    order_id,
+    order_date,
+    seller_id,
+    status,
+    total_amount
+FROM orders_partitioned
+ORDER BY total_amount DESC
+LIMIT 10;
+
+Limit  (cost=1.46..2.78 rows=10 width=90) (actual time=0.148..0.219 rows=10 loops=1)
+   ->  Merge Append  (cost=1.46..228624.51 rows=1738368 width=90) (actual time=0.145..0.213 rows=10 loops=1)
+         Sort Key: orders_partitioned.total_amount DESC
+         ->  Index Scan using orders_2025_08_total_amount_idx on orders_2025_08 orders_partitioned_1  (cost=0.42..68350.35 rows=585728 width=90) (actual time=0.067..0.075 rows=2 loops=1)
+         ->  Index Scan using orders_2025_09_total_amount_idx on orders_2025_09 orders_partitioned_2  (cost=0.42..65493.55 rows=566208 width=90) (actual time=0.035..0.051 rows=5 loops=1)
+         ->  Index Scan using orders_2025_10_total_amount_idx on orders_2025_10 orders_partitioned_3  (cost=0.42..68651.31 rows=585792 width=90) (actual time=0.035..0.065 rows=5 loops=1)
+         ->  Index Scan using orders_default_total_amount_idx on orders_default orders_partitioned_4  (cost=0.15..53.75 rows=640 width=90) (actual time=0.003..0.003 rows=0 loops=1)
+ Planning Time: 0.381 ms
+ Execution Time: 0.292 ms
+
+EXPLAIN ANALYZE
+SELECT
+    order_id,
+    order_date,
+    seller_id,
+    status,
+    total_amount
+FROM orders_partitioned
+ORDER BY total_amount DESC
+LIMIT 10;
+
+ Limit  (cost=1.46..2.78 rows=10 width=90) (actual time=0.079..0.113 rows=10 loops=1)
+   ->  Merge Append  (cost=1.46..228624.51 rows=1738368 width=90) (actual time=0.077..0.108 rows=10 loops=1)
+         Sort Key: orders_partitioned.total_amount DESC
+         ->  Index Scan using orders_2025_08_total_amount_idx on orders_2025_08 orders_partitioned_1  (cost=0.42..68350.35 rows=585728 width=90) (actual time=0.046..0.048 rows=2 loops=1)
+         ->  Index Scan using orders_2025_09_total_amount_idx on orders_2025_09 orders_partitioned_2  (cost=0.42..65493.55 rows=566208 width=90) (actual time=0.012..0.022 rows=5 loops=1)
+         ->  Index Scan using orders_2025_10_total_amount_idx on orders_2025_10 orders_partitioned_3  (cost=0.42..68651.31 rows=585792 width=90) (actual time=0.011..0.017 rows=5 loops=1)
+         ->  Index Scan using orders_default_total_amount_idx on orders_default orders_partitioned_4  (cost=0.15..53.75 rows=640 width=90) (actual time=0.003..0.003 rows=0 loops=1)
+ Planning Time: 0.323 ms
+ Execution Time: 0.165 ms
+

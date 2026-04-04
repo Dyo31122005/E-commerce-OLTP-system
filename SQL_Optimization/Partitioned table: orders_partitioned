@@ -1,0 +1,23 @@
+DROP TABLE IF EXISTS orders_partitioned CASCADE;
+
+CREATE TABLE orders_partitioned (
+    order_id     SERIAL,
+    order_date   TIMESTAMP     NOT NULL,
+    seller_id    INT           NOT NULL,
+    status       VARCHAR(20)   NOT NULL,
+    total_amount DECIMAL(12,2) NOT NULL,
+    created_at   TIMESTAMP     NOT NULL
+) PARTITION BY RANGE (order_date);
+
+-- Monthly partitions: Aug / Sep / Oct 2025
+CREATE TABLE orders_2025_08 PARTITION OF orders_partitioned
+    FOR VALUES FROM ('2025-08-01') TO ('2025-09-01');
+
+CREATE TABLE orders_2025_09 PARTITION OF orders_partitioned
+    FOR VALUES FROM ('2025-09-01') TO ('2025-10-01');
+
+CREATE TABLE orders_2025_10 PARTITION OF orders_partitioned
+    FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
+
+-- Default partition (catch-all for out-of-range rows)
+CREATE TABLE orders_default PARTITION OF orders_partitioned DEFAULT;

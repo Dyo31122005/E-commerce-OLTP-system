@@ -1,0 +1,69 @@
+EXPLAIN ANALYZE
+SELECT
+    oi.product_id,
+    DATE_TRUNC('month', oi.order_date) AS month,
+    SUM(oi.subtotal)                   AS monthly_revenue,
+    SUM(oi.quantity)                   AS monthly_qty
+FROM order_item oi
+GROUP BY oi.product_id, 2
+ORDER BY oi.product_id, 2;
+
+ Finalize GroupAggregate  (cost=396904.28..407838.26 rows=40000 width=52) (actual time=570.118..574.960 rows=1365 loops=1)
+   Group Key: product_id, (date_trunc('month'::text, order_date))
+   ->  Gather Merge  (cost=396904.28..406238.26 rows=80000 width=52) (actual time=570.104..573.970 rows=4095 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         ->  Sort  (cost=395904.25..396004.25 rows=40000 width=52) (actual time=560.013..560.054 rows=1365 loops=3)
+               Sort Key: product_id, (date_trunc('month'::text, order_date))
+               Sort Method: quicksort  Memory: 240kB
+               Worker 0:  Sort Method: quicksort  Memory: 240kB
+               Worker 1:  Sort Method: quicksort  Memory: 240kB
+               ->  Partial HashAggregate  (cost=352698.97..392846.71 rows=40000 width=52) (actual time=559.416..559.706 rows=1365 loops=3)
+                     Group Key: product_id, date_trunc('month'::text, order_date)
+                     Planned Partitions: 4  Batches: 1  Memory Usage: 1169kB
+                     Worker 0:  Batches: 1  Memory Usage: 1169kB
+                     Worker 1:  Batches: 1  Memory Usage: 1169kB
+                     ->  Parallel Seq Scan on order_item oi  (cost=0.00..107728.94 rows=2892635 width=32) (actual time=4.229..253.162 rows=2314108 loops=3)
+ Planning Time: 0.222 ms
+ JIT:
+   Functions: 21
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 2.426 ms, Inlining 0.000 ms, Optimization 1.097 ms, Emission 11.580 ms, Total 15.103 ms
+ Execution Time: 577.169 ms
+
+ EXPLAIN ANALYZE
+SELECT
+    product_id,
+    DATE_TRUNC('month', order_date) AS month,
+    SUM(subtotal)                   AS monthly_revenue,
+    SUM(quantity)                   AS monthly_qty
+FROM order_item_partitioned
+GROUP BY product_id, 2
+ORDER BY product_id, 2;
+
+ Finalize GroupAggregate  (cost=369967.51..380901.49 rows=40000 width=52) (actual time=706.626..709.645 rows=1365 loops=1)
+   Group Key: order_item_partitioned.product_id, (date_trunc('month'::text, order_item_partitioned.order_date))
+   ->  Gather Merge  (cost=369967.51..379301.49 rows=80000 width=52) (actual time=706.612..709.017 rows=2101 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         ->  Sort  (cost=368967.48..369067.48 rows=40000 width=52) (actual time=671.226..671.246 rows=700 loops=3)
+               Sort Key: order_item_partitioned.product_id, (date_trunc('month'::text, order_item_partitioned.order_date))
+               Sort Method: quicksort  Memory: 216kB
+               Worker 0:  Sort Method: quicksort  Memory: 88kB
+               Worker 1:  Sort Method: quicksort  Memory: 88kB
+               ->  Partial HashAggregate  (cost=330649.07..365909.94 rows=40000 width=52) (actual time=670.886..671.053 rows=700 loops=3)
+                     Group Key: order_item_partitioned.product_id, (date_trunc('month'::text, order_item_partitioned.order_date))
+                     Planned Partitions: 4  Batches: 1  Memory Usage: 1169kB
+                     Worker 0:  Batches: 1  Memory Usage: 657kB
+                     Worker 1:  Batches: 1  Memory Usage: 657kB
+                     ->  Parallel Append  (cost=0.00..115949.74 rows=2535195 width=32) (actual time=15.467..358.380 rows=2314108 loops=3)
+                           ->  Parallel Seq Scan on order_item_2025_10 order_item_partitioned_3  (cost=0.00..34808.22 rows=854498 width=32) (actual time=2.636..89.126 rows=780094 loops=3)
+                           ->  Parallel Seq Scan on order_item_2025_08 order_item_partitioned_1  (cost=0.00..34806.78 rows=854462 width=32) (actual time=3.835..140.183 rows=1170074 loops=2)
+                           ->  Parallel Seq Scan on order_item_2025_09 order_item_partitioned_2  (cost=0.00..33642.51 rows=825881 width=32) (actual time=30.852..295.606 rows=2261895 loops=1)
+                           ->  Parallel Seq Scan on order_item_default order_item_partitioned_4  (cost=0.00..16.25 rows=500 width=32) (actual time=0.003..0.003 rows=0 loops=1)
+ Planning Time: 0.404 ms
+ JIT:
+   Functions: 39
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 6.409 ms, Inlining 0.000 ms, Optimization 2.735 ms, Emission 43.540 ms, Total 52.684 ms
+ Execution Time: 712.185 ms

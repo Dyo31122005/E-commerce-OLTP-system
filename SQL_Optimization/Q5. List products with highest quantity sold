@@ -1,0 +1,71 @@
+EXPLAIN ANALYZE
+SELECT
+    oi.product_id,
+    SUM(oi.quantity)   AS total_qty_sold,
+    SUM(oi.subtotal)   AS total_revenue
+FROM order_item oi
+GROUP BY oi.product_id
+ORDER BY total_qty_sold DESC
+LIMIT 20;
+
+ Limit  (cost=123260.78..123260.83 rows=20 width=44) (actual time=541.418..547.507 rows=20 loops=1)
+   ->  Sort  (cost=123260.78..123261.28 rows=200 width=44) (actual time=508.439..514.527 rows=20 loops=1)
+         Sort Key: (sum(quantity)) DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         ->  Finalize GroupAggregate  (cost=123202.28..123255.45 rows=200 width=44) (actual time=507.922..514.452 rows=455 loops=1)
+               Group Key: product_id
+               ->  Gather Merge  (cost=123202.28..123248.95 rows=400 width=44) (actual time=507.904..514.102 rows=1365 loops=1)
+                     Workers Planned: 2
+                     Workers Launched: 2
+                     ->  Sort  (cost=122202.26..122202.76 rows=200 width=44) (actual time=496.382..496.395 rows=455 loops=3)
+                           Sort Key: product_id
+                           Sort Method: quicksort  Memory: 88kB
+ Planning Time: 0.213 ms
+ JIT:
+   Functions: 22
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 2.083 ms, Inlining 0.000 ms, Optimization 1.193 ms, Emission 22.476 ms, Total 25.751 ms
+ Execution Time: 512.019 ms
+
+
+EXPLAIN ANALYZE
+SELECT
+    product_id,
+    SUM(quantity)  AS total_qty_sold,
+    SUM(subtotal)  AS total_revenue
+FROM order_item_partitioned
+GROUP BY product_id
+ORDER BY total_qty_sold DESC
+LIMIT 20;
+
+Limit  (cost=129694.01..129694.06 rows=20 width=44) (actual time=607.253..609.982 rows=20 loops=1)
+   ->  Sort  (cost=129694.01..129694.51 rows=200 width=44) (actual time=598.026..600.753 rows=20 loops=1)
+         Sort Key: (sum(order_item_partitioned.quantity)) DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         ->  Finalize GroupAggregate  (cost=129635.52..129688.69 rows=200 width=44) (actual time=597.513..600.693 rows=455 loops=1)
+               Group Key: order_item_partitioned.product_id
+               ->  Gather Merge  (cost=129635.52..129682.19 rows=400 width=44) (actual time=597.495..600.338 rows=1365 loops=1)
+                     Workers Planned: 2
+                     Workers Launched: 2
+                     ->  Sort  (cost=128635.50..128636.00 rows=200 width=44) (actual time=576.360..576.373 rows=455 loops=3)
+                           Sort Key: order_item_partitioned.product_id
+                           Sort Method: quicksort  Memory: 88kB
+                           Worker 0:  Sort Method: quicksort  Memory: 88kB
+                           Worker 1:  Sort Method: quicksort  Memory: 88kB
+                           ->  Partial HashAggregate  (cost=128625.35..128627.85 rows=200 width=44) (actual time=576.190..576.269 rows=455 loops=3)
+                                 Group Key: order_item_partitioned.product_id
+                                 Batches: 1  Memory Usage: 301kB
+                                 Worker 0:  Batches: 1  Memory Usage: 301kB
+                                 Worker 1:  Batches: 1  Memory Usage: 301kB
+                                 ->  Parallel Append  (cost=0.00..109611.39 rows=2535195 width=24) (actual time=6.983..243.147 rows=2314108 loops=3)
+                                       ->  Parallel Seq Scan on order_item_2025_10 order_item_partitioned_3  (cost=0.00..32671.98 rows=854498 width=24) (actual time=3.482..55.602 rows=780094 loops=3)
+                                       ->  Parallel Seq Scan on order_item_2025_08 order_item_partitioned_1  (cost=0.00..32670.62 rows=854462 width=24) (actual time=5.274..82.537 rows=1170074 loops=2)
+                                       ->  Parallel Seq Scan on order_item_2025_09 order_item_partitioned_2  (cost=0.00..31577.81 rows=825881 width=24) (actual time=0.018..163.354 rows=2261895 loops=1)
+                                       ->  Parallel Seq Scan on order_item_default order_item_partitioned_4  (cost=0.00..15.00 rows=500 width=24) (actual time=0.001..0.001 rows=0 loops=1)
+ Planning Time: 0.545 ms
+ JIT:
+   Functions: 40
+   Options: Inlining false, Optimization false, Expressions true, Deforming true
+   Timing: Generation 4.021 ms, Inlining 0.000 ms, Optimization 2.189 ms, Emission 27.943 ms, Total 34.153 ms
+ Execution Time: 611.938 ms
+(30 rows)

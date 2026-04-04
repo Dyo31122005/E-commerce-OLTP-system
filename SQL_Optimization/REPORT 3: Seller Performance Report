@@ -1,0 +1,80 @@
+--  Goal   : Compare sellers by revenue and quantity sold
+--  Columns: seller_id, seller_name, total_orders,
+--           total_quantity, total_revenue
+--  Filter : date range + optional category_id + optional brand_id
+-- ============================================================
+CREATE OR REPLACE FUNCTION rpt_seller_performance(
+    p_start_date  DATE,
+    p_end_date    DATE,
+    p_category_id INT  DEFAULT NULL,   -- NULL = all categories
+    p_brand_id    INT  DEFAULT NULL    -- NULL = all brands
+)
+RETURNS TABLE (
+    seller_id      INT,
+    seller_name    VARCHAR(150),
+    total_orders   BIGINT,
+    total_quantity BIGINT,
+    total_revenue  NUMERIC(18,2)
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_start_date > p_end_date THEN
+        RAISE EXCEPTION 'start_date (%) must be <= end_date (%)', p_start_date, p_end_date;
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        s.seller_id,
+        s.seller_name,
+        COUNT(DISTINCT o.order_id)            AS total_orders,
+        COALESCE(SUM(oi.quantity), 0)::BIGINT AS total_quantity,
+        COALESCE(SUM(oi.subtotal), 0)         AS total_revenue
+    FROM orders o
+    JOIN seller     s  ON s.seller_id   = o.seller_id
+    JOIN order_item oi ON oi.order_id   = o.order_id
+    JOIN product    p  ON p.product_id  = oi.product_id
+    WHERE o.order_date >= p_start_date::TIMESTAMP
+      AND o.order_date <  (p_end_date + INTERVAL '1 day')::TIMESTAMP
+      AND o.status NOT IN ('CANCELLED', 'RETURNED')
+      AND (p_category_id IS NULL OR p.category_id = p_category_id)
+      AND (p_brand_id    IS NULL OR p.brand_id    = p_brand_id)
+    GROUP BY s.seller_id, s.seller_name
+    ORDER BY total_revenue DESC;
+END;
+$$;
+
+-- Usage examples:
+-- All sellers, no filter:
+-- SELECT * FROM rpt_seller_performance('2025-08-01', '2025-10-31');
+--
+-- Filter by category:
+-- SELECT * FROM rpt_seller_performance('2025-08-01', '2025-10-31', p_category_id => 3);
+seller_id |          seller_name           | total_orders | total_quantity |  total_revenue
+-----------+--------------------------------+--------------+----------------+------------------
+       189 | Kirk-Smith                     |        20378 |          60652 | 1893909641008.28
+        97 | Baxter-Butler                  |        16535 |          49955 | 1760997793792.45
+         3 | Nelson, King and Ramirez       |        16741 |          50072 | 1622739974488.16
+        65 | Espinoza-Wagner                |        11777 |          35426 | 1288204900127.70
+         2 | Daniels Inc                    |        10105 |          30382 |  966721584339.50
+        87 | Parks, Jacobs and Watkins      |        16686 |          50097 |  851092165332.39
+       179 | Smith-Mcdaniel                 |        16621 |          49997 |  846132538001.46
+        58 | Hall, Hobbs and Oconnell       |         9981 |          29956 |  782056683868.52
+        59 | Lara, Robinson and Smith       |        11874 |          35502 |  763458183350.58
+        15 | Dickerson LLC                  |        11976 |          35567 |  759815369011.02
+        45 | Stewart-Wheeler                |        12063 |          36344 |  587556745387.92
+        37 | Davis-Cook                     |         6695 |          19938 |  377103762898.62
+        57 | Marshall, Taylor and Macdonald |         8607 |          26179 |  371168440107.92
+        67 | Alvarez, Montgomery and Hughes |         8442 |          25442 |  254060389033.32
+        82 | Knight Inc                     |        15091 |          45027 |  246635427170.79
+        40 | Lopez Ltd                      |         6139 |          18148 |  224334998075.24
+        88 | Anderson, Elliott and Larson   |         6735 |          20228 |  191214770613.36
+        61 | Peterson, Santos and Mayer     |        20042 |          59904 |  120110270192.64
+        60 | Willis Group                   |        10173 |          30494 |   77396063929.04
+
+--
+-- Filter by brand:
+-- SELECT * FROM rpt_seller_performance('2025-08-01', '2025-10-31', p_brand_id => 7);
+--
+-- Filter by both:
+-- SELECT * FROM rpt_seller_performance('2025-08-01', '2025-10-31', p_category_id => 3, p_brand_id => 7);
